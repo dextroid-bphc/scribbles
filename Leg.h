@@ -7,7 +7,7 @@ private:
     // 0 = increment; 1 = decrement
     bool hipd, kneed, ankled;
     // the time is actually the delay that needs to be elapsed after every update
-    uint32_t _hipTime, _kneeTime, _ankleTime;
+    uint32_t _hipTime = 2, _kneeTime = 2, _ankleTime = 2;
     // we'll also need variables for the next position
     uint8_t _hipn, _kneen, _anklen;
     // and for updating the servos
@@ -23,9 +23,6 @@ public:
         _hipPin = hipPin;
         _kneePin = kneePin;
         _anklePin = anklePin;
-        _hipTime = transTime;
-        _kneeTime = transTime;
-        _ankleTime = transTime;
     }
 
     Leg(uint8_t hipPin, uint8_t kneePin, uint8_t anklePin, uint16_t transTime);
@@ -36,6 +33,7 @@ public:
         _hipPin = hipPin;
         _kneePin = kneePin;
         _anklePin = anklePin;
+        _transTime = transTime;
     }
     
     Leg();
@@ -65,6 +63,27 @@ public:
         analogWrite(_anklePin, ankle);
     }
 
+    void move(uint8_t hipn, uint8_t kneen, uint8_t anklen)
+    {
+        // this function creates NO motion, just updates variables
+        
+        hipd = ((_hipn - _hip) > 0) ? false : true;
+        kneed = ((_kneen - _knee) > 0) ? false : true;
+        ankled = ((_anklen - _ankle) > 0) ? false : true;
+        if(!_transTime)
+        {
+            _hipTime = transTime/abs(_hipn - _hip);
+            _kneeTime = transTime/abs(_kneen - _knee);
+            _ankleTime = transTime/abs(_anklen - _ankle);
+        }
+        else
+        {
+            _hipTime = 0;
+            _kneeTime = 0;
+            _ankleTime = 0;   
+        }
+    }
+
     void move(uint8_t hipn, uint8_t kneen, uint8_t anklen, uint32_t transTime)
     {
         // this function creates NO motion, just updates variables
@@ -86,9 +105,13 @@ public:
         }
     }
 
-    void update()
+    boolean update()
     {
         // this function needs to be called repeatedly to update ONE STEP of each individual servo
+
+        // return true if the movement is complete
+        if(_hipn == _hip && _kneen == _knee && _anklen == _ankle)
+            return true;
 
         // let's not call millis() repeatedly and use one data per call
         uint32_t timeNow = millis();
@@ -112,5 +135,7 @@ public:
         analogWrite(_hipPin, _hip);
         analogWrite(_kneePin, _knee);
         analogWrite(_anklePin, _ankle);
+
+        return false;
     }
 };
