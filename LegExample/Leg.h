@@ -210,9 +210,9 @@ public:
         }
         else
         {
-            Hip.writeMicroseconds(_hip);
-            Knee.writeMicroseconds(_knee);
-            Ankle.writeMicroseconds(_ankle);
+            Hip.write(_hip);
+            Knee.write(_knee);
+            Ankle.write(_ankle);
         }
 
         return false;
