@@ -185,17 +185,17 @@ public:
         // let's not call millis() repeatedly and use one data per call
         uint32_t timeNow = millis();
         
-        if(timeNow > _hipTime && _hip != _hipn)
+        if(timeNow - prevHipUpdate > _hipTime && _hip != _hipn)
         {
             _hip = (_hipd) ? _hip + 1 : _hip - 1;
             prevHipUpdate = timeNow;
         }
-        if(timeNow > _kneeTime && _knee != _kneen)
+        if(timeNow - prevKneeUpdate > _kneeTime && _knee != _kneen)
         {
             _knee = (_kneed) ? _knee + 1 : _knee - 1;
             prevKneeUpdate = timeNow;
         }
-        if(timeNow > _ankleTime && _ankle != _anklen)
+        if(timeNow - prevAnkleUpdate > _ankleTime && _ankle != _anklen)
         {
             _ankle = (_ankled) ? _ankle + 1 : _ankle - 1;
             prevAnkleUpdate = timeNow;
