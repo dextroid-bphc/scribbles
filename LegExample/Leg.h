@@ -1,16 +1,30 @@
 #include <Servo.h>
+
+//#define DEBUG 1
+#ifdef DEBUG
+ #include <HardwareSerial.h>
+#endif
+
+#if ARDUINO >= 100
+  #include "Arduino.h"
+#else
+  #include "WProgram.h"
+  #include "pins_arduino.h"
+  #include "WConstants.h"
+#endif
+
 class Leg
 {
 private:
     // we need to store data about every servo - the pin, the position, the step direction, and the transition time
     uint8_t _hipPin, _kneePin, _anklePin;
-    uint8_t _hip, _knee, _ankle;
+    uint16_t _hip, _knee, _ankle;
     // 0 = increment; 1 = decrement
     bool _hipd, _kneed, _ankled;
     // the time is actually the delay that needs to be elapsed after every update
     uint32_t _hipTime = 2, _kneeTime = 2, _ankleTime = 2;
     // we'll also need variables for the next position
-    uint8_t _hipn, _kneen, _anklen;
+    uint16_t _hipn, _kneen, _anklen;
     // and for updating the servos
     uint32_t prevHipUpdate = 0, prevKneeUpdate = 0, prevAnkleUpdate = 0;
     // and for storing the transition time
@@ -80,15 +94,25 @@ public:
                 _hip = map(_hip, 0, 180, 1000, 2000);
                 _knee = map(_knee, 0, 180, 1000, 2000);
                 _ankle = map(_ankle, 0, 180, 1000, 2000);
+                _hipn = map(_hip, 0, 180, 1000, 2000);
+                _kneen = map(_knee, 0, 180, 1000, 2000);
+                _anklen = map(_ankle, 0, 180, 1000, 2000);
             }
             else
             {
                 // scale values down
                 _hip = map(_hip, 1000, 2000, 0, 180);
                 _knee = map(_knee, 1000, 2000, 0, 180);
-                _ankle = map(_ankle, 1000, 2000, 0, 180);   
+                _ankle = map(_ankle, 1000, 2000, 0, 180);
+                _hipn = map(_hip, 1000, 2000, 0, 180);
+                _kneen = map(_knee, 1000, 2000, 0, 180);
+                _anklen = map(_ankle, 1000, 2000, 0, 180);   
             }
         }
+        #ifdef DEBUG
+            Serial.print("Precision: ");
+            Serial.println(_precision);
+        #endif
     }
 
     void setTransTime(uint32_t transTime)
@@ -99,6 +123,10 @@ public:
         // transTime can be 0
         // higher transTime ==> slower motion        
         _transTime = transTime;
+        #ifdef DEBUG
+            Serial.print("SetTransTime: ");
+            Serial.println(_transTime);
+        #endif
     }
 
     void move(uint8_t hipn, uint8_t kneen, uint8_t anklen)
@@ -119,15 +147,25 @@ public:
         }
 
         // determine servo step direction
-        _hipd = ((_hipn - _hip) > 0) ? false : true;
-        _kneed = ((_kneen - _knee) > 0) ? false : true;
-        _ankled = ((_anklen - _ankle) > 0) ? false : true;
+        _hipd = (_hipn > _hip) ? false : true;
+        _kneed = (_kneen > _knee) ? false : true;
+        _ankled = (_anklen > _ankle) ? false : true;
         
-        if(!_transTime)
+        if(_transTime)
         {
-            _hipTime = _transTime/abs(_hipn - _hip);
-            _kneeTime = _transTime/abs(_kneen - _knee);
-            _ankleTime = _transTime/abs(_anklen - _ankle);
+            // direction 0 ==> new target > current pos
+            if(_hip != _hipn)
+                _hipTime = _transTime/((_hipd)?(_hip - _hipn):(_hipn - _hip));
+            else
+                _hipTime = 0;
+            if(_knee != _kneen)
+                _kneeTime = _transTime/((_kneed)?(_knee - _kneen):(_kneen - _knee));
+            else
+                _kneeTime = 0;
+            if(_ankle != _anklen)
+                _ankleTime = _transTime/((_ankled)?(_ankle - _anklen):(_anklen - _ankle));
+            else
+                _ankleTime = 0;
         }
         else
         {
@@ -136,6 +174,20 @@ public:
             _kneeTime = 0;
             _ankleTime = 0;   
         }
+        #ifdef DEBUG
+            Serial.print(F("Diff : "));
+            Serial.print(_hipn - _hip);
+            Serial.print(F("\t"));
+            Serial.print(_kneen - _knee);
+            Serial.print(F("\t"));
+            Serial.println(_anklen - _ankle);
+            Serial.print(F("Time : "));
+            Serial.print(_hipTime);
+            Serial.print(F("\t"));
+            Serial.print(_kneeTime);
+            Serial.print(F("\t"));
+            Serial.println(_ankleTime);
+        #endif
     }
 
     void move(uint8_t hipn, uint8_t kneen, uint8_t anklen, uint32_t transTime)
@@ -155,15 +207,31 @@ public:
             _anklen = map(anklen, 0, 180, 1000, 2000);
         }
 
-        _hipd = ((_hipn - _hip) > 0) ? false : true;
-        _kneed = ((_kneen - _knee) > 0) ? false : true;
-        _ankled = ((_anklen - _ankle) > 0) ? false : true;
+        _hipd = (_hipn > _hip) ? false : true;
+        _kneed = (_kneen > _knee) ? false : true;
+        _ankled = (_anklen > _ankle) ? false : true;
 
-        if(!transTime)
+        if(transTime)
         {
-            _hipTime = transTime/abs(_hipn - _hip);
-            _kneeTime = transTime/abs(_kneen - _knee);
-            _ankleTime = transTime/abs(_anklen - _ankle);
+            // direction 0 ==> new target > current pos
+
+            // also, there can be a case where target == current
+            // we need to set the delay times to 0 explicitly otherwise the
+            // delay time counter will max out and create a huge delay
+            // because no divide by zero will be thrown
+
+            if(_hip != _hipn)
+                _hipTime = transTime/((_hipd)?(_hip - _hipn):(_hipn - _hip));
+            else
+                _hipTime = 0;
+            if(_knee != _kneen)
+                _kneeTime = transTime/((_kneed)?(_knee - _kneen):(_kneen - _knee));
+            else
+                _kneeTime = 0;
+            if(_ankle != _anklen)
+                _ankleTime = transTime/((_ankled)?(_ankle - _anklen):(_anklen - _ankle));
+            else
+                _ankleTime = 0;
         }
         else
         {
@@ -172,6 +240,22 @@ public:
             _kneeTime = 0;
             _ankleTime = 0;   
         }
+        #ifdef DEBUG
+            Serial.print("TempTransTime: ");
+            Serial.println(transTime);
+            Serial.print(F("Diff2: "));
+            Serial.print(_hipn - _hip);
+            Serial.print(F("\t"));
+            Serial.print(_kneen - _knee);
+            Serial.print(F("\t"));
+            Serial.println(_anklen - _ankle);
+            Serial.print(F("Time2: "));
+            Serial.print(_hipTime);
+            Serial.print(F("\t"));
+            Serial.print(_kneeTime);
+            Serial.print(F("\t"));
+            Serial.println(_ankleTime);
+        #endif
     }
 
     bool update()
@@ -187,17 +271,17 @@ public:
         
         if(timeNow - prevHipUpdate > _hipTime && _hip != _hipn)
         {
-            _hip = (_hipd) ? _hip + 1 : _hip - 1;
+            _hip = (_hipd) ? _hip - 1 : _hip + 1;
             prevHipUpdate = timeNow;
         }
         if(timeNow - prevKneeUpdate > _kneeTime && _knee != _kneen)
         {
-            _knee = (_kneed) ? _knee + 1 : _knee - 1;
+            _knee = (_kneed) ? _knee - 1 : _knee + 1;
             prevKneeUpdate = timeNow;
         }
         if(timeNow - prevAnkleUpdate > _ankleTime && _ankle != _anklen)
         {
-            _ankle = (_ankled) ? _ankle + 1 : _ankle - 1;
+            _ankle = (_ankled) ? _ankle - 1 : _ankle + 1;
             prevAnkleUpdate = timeNow;
         }
 
@@ -214,6 +298,14 @@ public:
             Knee.write(_knee);
             Ankle.write(_ankle);
         }
+
+        #ifdef DEBUG
+            Serial.print(_hip);
+            Serial.print(F("\t"));
+            Serial.print(_knee);
+            Serial.print(F("\t"));
+            Serial.println(_ankle);
+        #endif
 
         return false;
     }
